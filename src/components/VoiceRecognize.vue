@@ -1,55 +1,65 @@
 <template>
   <div>
-    <div class="header">
-      <el-button v-if="recognizeServerState!=1" @click="connectWs()">开始语音识别</el-button>
-      <el-button v-if="recognizeServerState==1" @click="suspendProcess()">
-        <!-- {{audioContext.state=="running"?"暂停":"恢复"}} -->
-        暂停/继续
-      </el-button>
-      <el-button v-if="recognizeServerState==1" @click="closeProcess()">停止</el-button>
-      <span style="float:right;padding-left:10px">
+    <div class="header-container">
+      <div class="logo-container">
+        <img :src="require('@/assets/logo.png')" />
+      </div>
+    </div>
+    <div class="info-container">
+      <el-button
+        type="primary"
+        round
+        size="mini"
+        v-if="recognizeServerState!=1"
+        @click="connectWs()"
+        :disabled="isUnable"
+      >开始识别</el-button>
+      <el-button round size="mini" v-if="recognizeServerState==1" @click="suspendProcess()">暂停/继续</el-button>
+      <el-button round size="mini" v-if="recognizeServerState==1" @click="closeProcess()">停止</el-button>
+      <span class="info">
         <h5>
           麦克风状态:
           <span :style="bindStyle(microphoneState)">{{formateMicrophoneState}}</span>
         </h5>
       </span>
-      <span style="float:right;padding-left:10px">
+      <span class="info">
         <h5>
-          实时语音服务连接状态:
+          实时语音服务:
           <span
             :style="bindStyle(recognizeServerState)"
           >{{formateServerState(recognizeServerState)}}</span>
         </h5>
       </span>
-      <span style="float:right;padding-left:10px">
+      <span class="info">
         <h5>
-          队列服务器连接状态:
+          队列服务器:
           <span
             :style="bindStyle(processServerState)"
           >{{formateServerState(processServerState)}}</span>
         </h5>
       </span>
     </div>
-    <div class="flex">
-      <div class>
+    <div class="main-container flex">
+      <div class="main-container-box">
         <el-card shadow="hover">
-          <div ref="canvasContainer" class="canvasContainer">
+          <div ref="canvasContainer" class="canvas-container">
             <h5 v-show="recognizeServerState!=1">语音识别尚未开始...</h5>
             <h5>{{resultTemp}}</h5>
             <canvas id="canvas" :height="canvas.height" :width="canvas.width"></canvas>
           </div>
         </el-card>
-        <el-card shadow="hover" style="margin-top:5px">
+        <el-card shadow="hover">
           <div slot="header">
             <span>唱词</span>
             <el-button
               :disabled="resultList.length==0"
               @click="downloadResults('artical')"
-              style="float: right; padding: 3px 0"
+              style="padding:0"
               type="text"
-            >导出唱词文件</el-button>
+              size="mini"
+            >导出唱词文件TXT</el-button>
           </div>
-          <div class="articalContainer">
+          <div class="artical-container">
             <div v-if="resultList.length!=0">
               <p style="color:#606266">{{artical}}</p>
             </div>
@@ -57,85 +67,104 @@
           </div>
         </el-card>
       </div>
-      <div class="container2">
-        <el-card shadow="hover" style="height:95%;overflow-y: auto">
+      <div class="main-container-box">
+        <el-card shadow="hover">
           <div slot="header">
             <span>识别结果</span>
             <el-button
-              :disabled="resultList.length==0"
-              @click="clearResults()"
-              style="float: right; padding: 3px 0"
-              type="text"
-            >清空识别内容</el-button>
-            <el-button
-              :disabled="resultList.length==0"
-              @click="downloadResults('txt')"
-              style="float: right; padding: 3px 5px"
-              type="text"
-            >导出 TXT 文件</el-button>
-            <el-button
-              :disabled="resultList.length==0"
-              @click="downloadResults('srt')"
-              style="float: right; padding: 3px 0"
-              type="text"
-            >导出 SRT 文件</el-button>
-            <el-button
-              :disabled="chunk==null"
-              @click="downloadResults('file')"
-              style="float: right; padding: 3px 0"
-              type="text"
-            >导出录音文件</el-button>
-            <el-button
+              size="mini"
               :disabled="resultList.length==0"
               @click="reverseTimeLine()"
-              style="padding:0"
               type="text"
             >正序/反序</el-button>
+            <el-button
+              size="mini"
+              :disabled="resultList.length==0"
+              @click="clearResults()"
+              type="text"
+            >清空</el-button>
+            <el-button
+              size="mini"
+              :disabled="resultList.length==0"
+              @click="downloadResults('txt')"
+              type="text"
+            >导出TXT</el-button>
+            <el-button
+              size="mini"
+              :disabled="resultList.length==0"
+              @click="downloadResults('srt')"
+              type="text"
+            >导出SRT</el-button>
+            <el-button
+              size="mini"
+              :disabled="chunk==null"
+              @click="downloadResults('file')"
+              type="text"
+            >导出录音</el-button>
           </div>
-          <el-timeline v-if="resultList.length!=0" :reverse="reverse">
-            <el-timeline-item
-              v-for="(item, index) in resultList"
-              :key="index"
-              :timestamp="item.bg+'-->'+item.ed"
-              placement="top"
-            >
-              <div class="flex">
-                <div style="width:80%">
-                  <p
-                    style="color:#606266"
-                    v-if="!item.isEditAble"
-                    @click="edit(item)"
-                  >{{item.sentence}}</p>
-                  <div v-else>
-                    <el-input autofocus ref="input" v-model="item.sentence" size="small">
-                      <el-button @click="quitEdit(item)" slot="append" icon="el-icon-check"></el-button>
-                    </el-input>
+          <div class="result-container">
+            <el-timeline v-if="resultList.length!=0" :reverse="reverse">
+              <el-timeline-item
+                v-for="(item, index) in resultList"
+                :key="index"
+                :timestamp="formatMillisecond(item.bg)+'-->'+formatMillisecond(item.ed)"
+                placement="top"
+                v-show="(item.sentence).replace(/，|。|？|！/gi,'')!=''"
+              >
+                <div class="flex space-between">
+                  <div>
+                    <p
+                      style="color:#606266"
+                      v-if="!item.isEditAble"
+                      @click="item.isEditAble=true"
+                    >{{(item.sentence).replace(/，|。|？|！/gi,"")}}</p>
+                    <div v-else>
+                      <el-input
+                        @blur="item.isEditAble = false"
+                        autofocus
+                        ref="input"
+                        v-model="item.sentence"
+                        size="mini"
+                      >
+                        <el-button
+                          @click="item.isEditAble= false"
+                          slot="append"
+                          icon="el-icon-check"
+                        ></el-button>
+                      </el-input>
+                    </div>
+                  </div>
+                  <div>
+                    <el-button
+                      @click="deleteSingleResult(index)"
+                      style="padding:0 8px;float:right"
+                      type="text"
+                      size="mini"
+                    >删除</el-button>
                   </div>
                 </div>
-                <div>
-                  <el-button @click="deleteSingleResult(index)" style="padding-top:0" type="text">删除</el-button>
-                </div>
-              </div>
-            </el-timeline-item>
-          </el-timeline>
-          <h5 v-else>当前识别结果为空</h5>
+              </el-timeline-item>
+            </el-timeline>
+            <h5 v-else>当前识别结果为空</h5>
+          </div>
         </el-card>
       </div>
     </div>
   </div>
 </template>
 <script>
-import { AudioCompiler } from "./../utils/utils";
+import { AudioCompiler, getUrlKey } from "./../utils/utils";
 export default {
   name: "VoiceRecognize",
   data() {
     return {
+      isUnable: true,
       reverse: true,
       webSocket: null,
       webSocketForProcess: null,
       resultList: [],
       chunk: null,
-      resultTemp: "",
+      resultTemp: " ",
       recorder: "",
       canvasCtx: null,
       canvas: {
@@ -155,7 +184,7 @@ export default {
       let date = new Date();
       let year = String(date.getFullYear());
       let month = String(date.getMonth() + 1);
-      let day = String(this.addZero(date.getDay()));
+      let day = String(this.addZero(date.getDate()));
       let hour = String(date.getHours());
       let minute = String(date.getMinutes());
       let second = String(date.getSeconds());
@@ -170,19 +199,13 @@ export default {
     }
   },
   mounted() {
-    this.canvas.width = this.$refs.canvasContainer.offsetWidth - 10;
-    this.canvas.height = this.$refs.canvasContainer.offsetHeight - 10;
+    this.resolveToken();
+    this.initCtx();
   },
   beforeDestroy() {
     this.closeProcess();
   },
   methods: {
-    edit(item) {
-      item.isEditAble = true;
-    },
-    quitEdit(item) {
-      item.isEditAble = false;
-    },
     bindStyle(val) {
       return val == 1 ? "color:green" : val == 2 ? "color:red" : "";
     },
@@ -207,6 +230,7 @@ export default {
       }
     },
     connectWs() {
+      this.chunk = null;
       let CreateWebSocket = (() => {
         return urlValue => {
           if (window.WebSocket) return new WebSocket(urlValue);
@@ -214,7 +238,7 @@ export default {
           return false;
         };
       })();
-      this.webSocketForProcess = CreateWebSocket("ws://10.20.38.105:8089/websocket/1");
+      this.webSocketForProcess = CreateWebSocket("ws://10.20.56.42:8090/websocket/1");
       this.webSocketForProcess.onopen = () => {
         this.processServerState = 1;
         this.webSocket = CreateWebSocket("ws://10.20.61.3:8211/ast?lang=cn&codec=pcm_s16le&samplerate=16000");
@@ -247,18 +271,26 @@ export default {
           console.log(JSON.parse(message.data).sessionId);
         } else {
           let messageResult = JSON.parse(message.data);
-          let sentence = "";
-          messageResult.ws.forEach(item => {
-            sentence += item.cw[0].w;
-          });
-          if (JSON.parse(message.data).msgtype == "sentence" && sentence != "。") {
-            this.resultList.push({
-              bg: this.formatMillisecond(messageResult.bg),
-              ed: this.formatMillisecond(messageResult.ed),
-              sentence: sentence,
-              isEditAble: false
+
+          if (messageResult.msgtype == "sentence") {
+            let sentence = "";
+            for (let i = 0; i < messageResult.ws.length; i++) {
+              sentence += messageResult.ws[i].cw[0].w;
+              if (messageResult.ws[i].cw[0].wp == "p" || i == messageResult.ws.length - 1) {
+                this.resultList.push({
+                  bg: messageResult.bg + messageResult.ws[i].cw[0].wb,
+                  ed: messageResult.bg + messageResult.ws[i].cw[0].we,
+                  sentence: sentence,
+                  isEditAble: false
+                });
+                sentence = "";
+              }
+            }
+          } else if (messageResult.msgtype == "progressive") {
+            let sentence = "";
+            messageResult.ws.forEach(item => {
+              sentence += item.cw[0].w;
             });
-          } else if (JSON.parse(message.data).msgtype == "progressive") {
             this.resultTemp = sentence.split(1)[0];
           }
         }
@@ -271,7 +303,9 @@ export default {
       let downloadResult = "";
       if (type == "srt") {
         this.resultList.forEach((item, index) => {
-          downloadResult += `${index + 1}\r\n${item.bg} --> ${item.ed}\r\n${item.sentence}\r\n\r\n`;
+          downloadResult += `${index + 1}\r\n${this.formatMillisecond(item.bg)} --> ${this.formatMillisecond(item.ed)}\r\n${
+            item.sentence
+          }\r\n\r\n`;
         });
       } else if (type == "txt") {
         this.resultList.forEach(item => {
@@ -289,7 +323,7 @@ export default {
         let downloadElement = document.createElement("a");
         let href = window.URL.createObjectURL(blob);
         downloadElement.href = href;
-        downloadElement.download = `${this.currentDate}实时语音.${type == "srt" ? "srt" : type == "file" ? "mp3" : "txt"}`;
+        downloadElement.download = `${this.currentDate}实时语音.${type == "srt" ? "srt" : type == "file" ? "wav" : "txt"}`;
         document.body.appendChild(downloadElement);
         downloadElement.click();
         document.body.removeChild(downloadElement);
@@ -327,7 +361,7 @@ export default {
             this.analyser.connect(compressScript);
             compressScript.connect(this.audioContext.destination);
           })
-          .catch(function(err) {
+          .catch(err => {
             console.log(err.name + ": " + err.message);
           });
       } else {
@@ -370,12 +404,18 @@ export default {
       this.bufferLength = this.analyser.frequencyBinCount;
       this.dataArray = new Uint8Array(this.bufferLength);
     },
+    //初始化 ctx 尺寸
+    initCtx() {
+      this.canvas.width = this.$refs.canvasContainer.offsetWidth - 5;
+      this.canvas.height = this.$refs.canvasContainer.offsetHeight - 5;
+    },
+    //绘图
     draw() {
       const canvas = document.getElementById("canvas");
       this.canvasCtx = canvas.getContext("2d");
       let cWidth = this.canvas.width,
         cHeight = this.canvas.height,
-        barWidth = parseInt((1.6 * cWidth) / this.bufferLength),
+        barWidth = parseInt((1.8 * cWidth) / this.bufferLength),
         barHeight,
         x = 0;
       this.canvasCtx.clearRect(0, 0, cWidth, cHeight);
@@ -384,55 +424,113 @@ export default {
 
       //把每个音频“切片”画在画布上
       for (var i = 0; i < this.bufferLength; i++) {
-        barHeight = parseInt(1 * this.dataArray[i]);
+        barHeight = parseInt(1.4 * this.dataArray[i]);
         // this.canvasCtx.fillStyle = "rgb(27, 49, 114)";
-        let color = `rgb(${i + 27}, ${6 * i + 49},${6 * i + 144})`;
+        let color = `rgb(${i + 87}, ${6 * i + 174},${6 * i + 248})`;
         // console.log(color);
         this.canvasCtx.fillStyle = color;
         this.canvasCtx.fillRect(x, cHeight - barHeight, barWidth, barHeight);
-        x += barWidth + 1;
+        x += barWidth + 5;
       }
+    },
+
+    //解析 token
+    resolveToken() {
+      this.$axios
+        .post(
+          `http://10.20.56.42:9001/tool`,
+          {},
+          {
+            headers: { Authorization: getUrlKey("token"), timeout: 5000 }
+          }
+        )
+        .then(res => {
+          if (res.data.code == 200) {
+            let toolIndex = res.data.data.findIndex(item => {
+              return item.permissionCode == "tool_voice_lighting";
+            });
+            if (toolIndex != -1) {
+              this.isUnable = false;
+            } else {
+              alert("您暂时无法使用此工具");
+            }
+          } else {
+            alert("无法验证使用权限,请重试");
+          }
+        })
+        .catch(() => {
+          alert("无法验证权限,请重试");
+        });
     }
   }
 };
 </script>
 <style lang="scss">
+$body_margin_left: 15%;
+.header-container {
+  width: 100%-2 * $body_margin_left;
+  margin-left: $body_margin_left;
+  border-bottom: 1px solid #bec3c6;
+  height: 50px;
+  & .logo-container {
+    height: 70%;
+    margin-top: 15px;
+    & img {
+      max-height: 100%;
+    }
+  }
+}
+.info-container {
+  width: 100%-2 * $body_margin_left;
+  margin-left: $body_margin_left;
+  height: 40px;
+  & .el-button {
+    margin-top: 7px;
+  }
+  & .info {
+    float: right;
+    padding: 7px;
+  }
+}
+
+.main-container {
+  width: 100%-2 * $body_margin_left;
+  margin-left: $body_margin_left;
+  & .el-card {
+    margin: 3px;
+  }
+  & .main-container-box {
+    width: 50%;
+  }
+  & .main-container-box {
+    & .canvas-container {
+      height: 37vh;
+    }
+    & .artical-container {
+      height: 33vh;
+      overflow-y: auto;
+    }
+    & .result-container {
+      height: 72vh;
+      overflow-y: auto;
+      & .el-timeline-item {
+        margin: 5px;
+      }
+      & .el-timeline-item:hover {
+        background-color: #d2d8df;
+      }
+    }
+  }
+}
+
 h5 {
-  color: #616266;
+  color: #506581;
 }
-.header {
-  height: 5vh;
-  min-height: 10px;
-  padding: 10px;
-}
-.el-button {
-  margin: 10px;
-}
+
 .flex {
   display: flex;
+}
+.space-between {
   justify-content: space-between;
-}
-.container {
-  margin-left: 0.5vw;
-  width: 48vw;
-  height: 400px;
-  overflow-y: auto;
-}
-.container2 {
-  margin-right: 0.5vw;
-  width: 48vw;
-  height: 92vh;
-  overflow-y: auto;
-}
-.canvasContainer {
-  margin-left: 0vw;
-  width: 48vw;
-  height: 38vh;
-}
-.articalContainer {
-  margin-left: 0vw;
-  width: 48vw;
-  height: 35vh;
-  overflow-y: auto;
 }
 </style>

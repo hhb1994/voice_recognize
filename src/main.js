@@ -1,9 +1,11 @@
-import Vue from 'vue'
-import App from './App.vue'
-import './plugins/element.js'
+import Vue from "vue";
+import App from "./App.vue";
+import "./plugins/element.js";
 
-Vue.config.productionTip = false
+Vue.config.productionTip = false;
 
+import axios from "axios";
+Vue.prototype.$axios = axios;
 new Vue({
-  render: h => h(App),
-}).$mount('#app')
+  render: h => h(App)
+}).$mount("#app");
