@@ -160,6 +160,7 @@ export default {
     return {
       isUnable: true,
       reverse: true,
+      CreateWebSocket: null,
       webSocket: null,
       webSocketForProcess: null,
       resultList: [],
@@ -231,37 +232,47 @@ export default {
     },
     connectWs() {
       this.chunk = null;
-      let CreateWebSocket = (() => {
+      this.CreateWebSocket = (() => {
         return urlValue => {
           if (window.WebSocket) return new WebSocket(urlValue);
           if (window.MozWebSocket) return new MozWebSocket(urlValue);
           return false;
         };
       })();
-      this.webSocketForProcess = CreateWebSocket("ws://10.20.56.42:8090/websocket/1");
+      this.webSocketForProcess = this.CreateWebSocket("ws://10.20.56.42:8090/websocket/1");
       this.webSocketForProcess.onopen = () => {
         this.processServerState = 1;
-        this.webSocket = CreateWebSocket("ws://10.20.61.3:8211/ast?lang=cn&codec=pcm_s16le&samplerate=16000");
-        this.webSocket.onopen = e => {
-          this.recognizeServerState = 1;
-          console.log("ws 已开启,连接成功");
-          this.onWsMessage();
-          this.catchStream();
-        };
-        this.webSocket.onclose = e => {
-          this.recognizeServerState = 0;
-          console.log("ws 已关闭");
-        };
-        this.webSocket.onerror = e => {
-          this.recognizeServerState = 2;
-          console.log("ws连接出错");
-        };
+      };
+
+      this.webSocketForProcess.onmessage = message => {
+        if (JSON.parse(message.data).status == "success") {
+          this.initRecognizeWs();
+        } else {
+          alert("与服务器校验出错或超出最大连接数");
+        }
       };
       this.webSocketForProcess.onclose = () => {
         this.processServerState = 0;
       };
       this.webSocketForProcess.onerror = () => {
         this.processServerState = 2;
+      };
+    },
+    initRecognizeWs() {
+      this.webSocket = this.CreateWebSocket("ws://10.20.61.3:8211/ast?lang=cn&codec=pcm_s16le&samplerate=16000");
+      this.webSocket.onopen = e => {
+        this.recognizeServerState = 1;
+        console.log("ws 已开启,连接成功");
+        this.onWsMessage();
+        this.catchStream();
+      };
+      this.webSocket.onclose = e => {
+        this.recognizeServerState = 0;
+        console.log("ws 已关闭");
+      };
+      this.webSocket.onerror = e => {
+        this.recognizeServerState = 2;
+        console.log("ws连接出错");
       };
     },
     onWsMessage() {
@@ -278,8 +289,8 @@ export default {
               sentence += messageResult.ws[i].cw[0].w;
               if (messageResult.ws[i].cw[0].wp == "p" || i == messageResult.ws.length - 1) {
                 this.resultList.push({
-                  bg: messageResult.bg + messageResult.ws[i].cw[0].wb,
-                  ed: messageResult.bg + messageResult.ws[i].cw[0].we,
+                  bg: messageResult.bg + messageResult.ws[i].cw[0].wb * 10,
+                  ed: messageResult.bg + messageResult.ws[i].cw[0].we * 10,
                   sentence: sentence,
                   isEditAble: false
                 });
