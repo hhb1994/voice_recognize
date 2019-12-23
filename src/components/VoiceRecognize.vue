@@ -199,6 +199,17 @@ export default {
       return text;
     }
   },
+  beforeMount() {
+    window.onbeforeunload = function(e) {
+      e = e || window.event;
+      // 兼容IE8和Firefox 4之前的版本
+      if (e) {
+        e.returnValue = "关闭提示";
+      }
+      // Chrome, Safari, Firefox 4+, Opera 12+ , IE 9+
+      return "关闭提示";
+    };
+  },
   mounted() {
     this.resolveToken();
     this.initCtx();
@@ -248,7 +259,7 @@ export default {
         if (JSON.parse(message.data).status == "success") {
           this.initRecognizeWs();
         } else {
-          alert("与服务器校验出错或超出最大连接数");
+          this.$message.error("与服务器校验出错或超出最大连接数");
         }
       };
       this.webSocketForProcess.onclose = () => {
@@ -256,30 +267,30 @@ export default {
       };
       this.webSocketForProcess.onerror = () => {
         this.processServerState = 2;
+        this.$message.error("连接鉴权服务器出错");
       };
     },
     initRecognizeWs() {
       this.webSocket = this.CreateWebSocket("ws://10.20.61.3:8211/ast?lang=cn&codec=pcm_s16le&samplerate=16000");
       this.webSocket.onopen = e => {
         this.recognizeServerState = 1;
-        console.log("ws 已开启,连接成功");
+        this.$message.success("ws 已开启,连接成功");
         this.onWsMessage();
         this.catchStream();
       };
       this.webSocket.onclose = e => {
         this.recognizeServerState = 0;
-        console.log("ws 已关闭");
+        this.$message.info("实时语音识别连接已关闭");
       };
       this.webSocket.onerror = e => {
         this.recognizeServerState = 2;
-        console.log("ws连接出错");
+        this.$message.error("ws连接出错");
       };
     },
     onWsMessage() {
       this.webSocket.onmessage = message => {
         this.resultTemp = " ";
         if (JSON.parse(message.data).sessionId) {
-          console.log(JSON.parse(message.data).sessionId);
         } else {
           let messageResult = JSON.parse(message.data);
 
@@ -328,13 +339,14 @@ export default {
         downloadResult = this.artical;
       }
       let blob = type == "file" ? this.chunk : new Blob([downloadResult]);
+      let fileUrl = `${this.currentDate}实时语音.${type == "srt" ? "srt" : type == "file" ? "wav" : "txt"}`;
       if ("msSaveOrOpenBlob" in navigator) {
-        window.navigator.msSaveOrOpenBlob(blob, `${fileName}`);
+        window.navigator.msSaveOrOpenBlob(blob, fileUrl);
       } else {
         let downloadElement = document.createElement("a");
         let href = window.URL.createObjectURL(blob);
         downloadElement.href = href;
-        downloadElement.download = `${this.currentDate}实时语音.${type == "srt" ? "srt" : type == "file" ? "wav" : "txt"}`;
+        downloadElement.download = fileUrl;
         document.body.appendChild(downloadElement);
         downloadElement.click();
         document.body.removeChild(downloadElement);
@@ -373,11 +385,11 @@ export default {
             compressScript.connect(this.audioContext.destination);
           })
           .catch(err => {
-            console.log(err.name + ": " + err.message);
+            this.$message.error(err.name + ": " + err.message);
           });
       } else {
         this.microphoneState = 2;
-        console.log("无法使用麦克风");
+        this.$message.error("无法使用麦克风");
       }
     },
     getRecordingData(e) {
@@ -436,9 +448,7 @@ export default {
       //把每个音频“切片”画在画布上
       for (var i = 0; i < this.bufferLength; i++) {
         barHeight = parseInt(1.4 * this.dataArray[i]);
-        // this.canvasCtx.fillStyle = "rgb(27, 49, 114)";
         let color = `rgb(${i + 87}, ${6 * i + 174},${6 * i + 248})`;
-        // console.log(color);
         this.canvasCtx.fillStyle = color;
         this.canvasCtx.fillRect(x, cHeight - barHeight, barWidth, barHeight);
         x += barWidth + 5;
@@ -463,14 +473,14 @@ export default {
             if (toolIndex != -1) {
               this.isUnable = false;
             } else {
-              alert("您暂时无法使用此工具");
+              this.$message.error("您暂时无法使用此工具");
             }
           } else {
-            alert("无法验证使用权限,请重试");
+            this.$message.error("无法验证使用权限,请确认权限并启用脚本");
           }
         })
         .catch(() => {
-          alert("无法验证权限,请重试");
+          this.$message.error("无法验证权限,请重试");
         });
     }
   }
