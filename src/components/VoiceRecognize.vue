@@ -11,11 +11,12 @@
         round
         size="mini"
         v-if="recognizeServerState!=1"
-        @click="connectWs()"
+        @click="resolveToken()"
         :disabled="isUnable"
       >开始识别</el-button>
       <el-button round size="mini" v-if="recognizeServerState==1" @click="suspendProcess()">暂停/继续</el-button>
       <el-button round size="mini" v-if="recognizeServerState==1" @click="closeProcess()">停止</el-button>
+      <!-- <span>{{formatMillisecond(time*1000).split(",")[0]}}</span> -->
       <span class="info">
         <h5>
           麦克风状态:
@@ -150,6 +151,41 @@
         </el-card>
       </div>
     </div>
+    <el-dialog :visible.sync="isHwVisible" title="选择使用场景">
+      <p>如果需要添加使用场景,请联系管理员!</p>
+      <el-button type="text" @click="connectWs()">不选择使用场景,直接开始实时语音识别</el-button>
+      <div class="flex space-around">
+        <div style="width:30%">
+          <h2>热词树🌲</h2>
+          <el-tree :data="hotwordList" :props="defaultProps" @node-click="handleNodeClick"></el-tree>
+        </div>
+
+        <div class="detail" style="width:20%">
+          <h2>热词列表</h2>
+          <div v-if="hotwords">
+            <el-tag
+              @click="confirmHotword(item,index)"
+              class="tag"
+              v-for="(item,index) in hotwords"
+              :key="index"
+              :type="bindTagType(index)"
+            >{{item.keyword}}</el-tag>
+          </div>
+          <div v-else>
+            <p>热词列表为空或没有选择热词树节点</p>
+          </div>
+        </div>
+        <div style="width:20%">
+          <h2>热词内容预览</h2>
+          <div style="height:300px;overflow-y:auto">
+            <p style="white-space: pre-line">{{hotWordContent?hotWordContent:"当前热词分类中无热词或未选中热词分类"}}</p>
+          </div>
+        </div>
+      </div>
+      <span slot="footer" class="dialog-footer">
+        <el-button @click="connectWsWithHotWord()" v-if="hotWordId!=null" type="primary">确 定</el-button>
+      </span>
+    </el-dialog>
   </div>
 </template>
 <script>
@@ -158,13 +194,25 @@ export default {
   name: "VoiceRecognize",
   data() {
     return {
-      isUnable: true,
+      isUnable: false,
+      isHwVisible: false,
+      defaultProps: {
+        children: "children",
+        label: "name"
+      },
+      hotwordList: [],
+      hotwords: [],
+      hotWordId: null,
+      hotWordContent: null,
+      activeTagIndex: null,
       reverse: true,
       CreateWebSocket: null,
       webSocket: null,
       webSocketForProcess: null,
       resultList: [],
       chunk: null,
+      // time: 0,
+      // timeInterval: null,
       resultTemp: " ",
       recorder: "",
       canvasCtx: null,
@@ -211,13 +259,21 @@ export default {
     };
   },
   mounted() {
-    this.resolveToken();
     this.initCtx();
+    this.getHotwordList();
   },
   beforeDestroy() {
     this.closeProcess();
   },
   methods: {
+    // beginTiming() {
+    //   this.timeInterval = setInterval(() => {
+    //     this.time++;
+    //   }, 1000);
+    // },
+    bindTagType(index) {
+      return index == this.activeTagIndex ? "success" : "";
+    },
     bindStyle(val) {
       return val == 1 ? "color:green" : val == 2 ? "color:red" : "";
     },
@@ -241,7 +297,64 @@ export default {
         return `${this.addZero(parseInt(tem1 / 3600))}:${this.addZero(parseInt(tem1 / 60) % 60)}:${this.addZero(tem1 % 60)},${milli}`;
       }
     },
+    handleNodeClick(data) {
+      this.hotWordContent = null;
+      this.activeTagIndex = null;
+      this.$axios
+        .get(`http://10.20.56.42:2333/open/hw/${data.id}?s=0`, {
+          headers: {
+            authToken: getUrlKey("token")
+          },
+          timeout: 5000
+        })
+        .then(res => {
+          if (res.data.status == 200) {
+            this.hotwords = res.data.data.words;
+          } else {
+            this.$message.error("获取热词列表出错");
+          }
+        });
+    },
+    getHotwordList() {
+      this.$axios
+        .get(`http://10.20.56.42:2333/open/hw/category`, {
+          headers: {
+            authToken: getUrlKey("token")
+          },
+          timeout: 5000
+        })
+        .then(res => {
+          if (res.data.status == 200) {
+            this.hotwordList = res.data.data;
+          } else {
+            this.$message.error("获取热词树🌲出错");
+          }
+        });
+    },
+    confirmHotword(item, index) {
+      this.activeTagIndex = index;
+      this.hotWordId = item.hotWordId;
+      this.$axios.get(`http://10.20.61.3:8211/ast/queryHotWord?hotWordId=${item.hotWordId}`).then(res => {
+        if (res.data.code == "000000") {
+          this.hotWordContent = JSON.parse(res.data.content.query).hotWord;
+        } else {
+          this.$message.error("获取热词美容失败");
+        }
+      });
+    },
+    connectWsWithHotWord() {
+      this.$messageBox
+        .confirm("确定要以此场景开始实时语音识别吗?", "提示", {
+          confirmButtonText: "确定",
+          cancelButtonText: "取消",
+          type: "warning"
+        })
+        .then(() => {
+          this.connectWs();
+        });
+    },
     connectWs() {
+      this.isHwVisible = false;
       this.chunk = null;
       this.CreateWebSocket = (() => {
         return urlValue => {
@@ -250,7 +363,7 @@ export default {
           return false;
         };
       })();
-      this.webSocketForProcess = this.CreateWebSocket("ws://10.20.56.42:8090/websocket/1");
+      this.webSocketForProcess = this.CreateWebSocket("ws://10.20.50.140:18092/websocket/1");
       this.webSocketForProcess.onopen = () => {
         this.processServerState = 1;
       };
@@ -271,12 +384,17 @@ export default {
       };
     },
     initRecognizeWs() {
-      this.webSocket = this.CreateWebSocket("ws://10.20.61.3:8211/ast?lang=cn&codec=pcm_s16le&samplerate=16000");
+      let recognizeWsUrl = "ws://10.20.50.140:18211/ast?lang=cn&codec=pcm_s16le&samplerate=16000";
+      if (this.hotWordId != null) {
+        recognizeWsUrl += `&hotWordId=${this.hotWordId}`;
+      }
+      this.webSocket = this.CreateWebSocket(recognizeWsUrl);
       this.webSocket.onopen = e => {
         this.recognizeServerState = 1;
         this.$message.success("ws 已开启,连接成功");
         this.onWsMessage();
         this.catchStream();
+        // this.beginTiming();
       };
       this.webSocket.onclose = e => {
         this.recognizeServerState = 0;
@@ -416,10 +534,18 @@ export default {
       }
     },
     closeProcess() {
-      this.audioContext.close();
-      this.webSocket.close();
-      this.webSocketForProcess.close();
-      this.recorder.stop();
+      if (this.audioContext) {
+        this.audioContext.close();
+      }
+      if (this.webSocket) {
+        this.webSocket.close();
+      }
+      if (this.webSocketForProcess) {
+        this.webSocketForProcess.close();
+      }
+      if (this.recorder) {
+        this.recorder.stop();
+      }
     },
     initAnalyser() {
       this.analyser = this.audioContext.createAnalyser();
@@ -454,7 +580,6 @@ export default {
         x += barWidth + 5;
       }
     },
-
     //解析 token
     resolveToken() {
       this.$axios
@@ -472,15 +597,20 @@ export default {
             });
             if (toolIndex != -1) {
               this.isUnable = false;
+              this.isHwVisible = true;
+              // this.connectWs();
             } else {
+              this.isUnable = true;
               this.$message.error("您暂时无法使用此工具");
             }
           } else {
-            this.$message.error("无法验证使用权限,请确认权限并启用脚本");
+            this.$message.error("无法验证使用权限,请尝试重新登录");
+            this.isUnable = true;
           }
         })
         .catch(() => {
-          this.$message.error("无法验证权限,请重试");
+          this.$message.error("请启用'不安全的脚本'后重试");
+          this.isUnable = true;
         });
     }
   }
@@ -553,5 +683,12 @@ h5 {
 }
 .space-between {
   justify-content: space-between;
+}
+.space-around {
+  justify-content: space-around;
+}
+.tag {
+  margin: 3px;
+  cursor: pointer;
 }
 </style>
