@@ -609,7 +609,11 @@ export default {
           }
         })
         .catch(() => {
-          this.$message.error("请启用'不安全的脚本'后重试");
+          this.$message({
+            duration: 0,
+            dangerouslyUseHTMLString: true,
+            message: `<a href="https://h123.cf/2020/02/03/2020.02.03.enableHttpOverHttpsWebpage/#more" target="_blank">点击这里来查看解决办法</a>`
+          });
           this.isUnable = true;
         });
     }
